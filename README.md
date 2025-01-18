@@ -256,6 +256,47 @@
         ``` Switch
         Switch(config-if)# ip access-group <acl_number> <in|out>
         ```
+    * Examples
+        * PC2 is unable to communicate with computer PC3 but should be able to communicate with Router RB
+            ```
+            SW1(config)#access-list 100 permit ip host 172.18.1.2 host 172.18.1.3
+            
+            SW1(config)#vlan access-map NOT-TO-PC 10
+            SW1(config-access-map)#match ip address 100
+            SW1(config-access-map)#action drop
+            SW1(config-access-map)#vlan access-map NOT-TO-PC 20
+            SW1(config-access-map)#action forward
+            
+            SW1(config)#vlan filter NOT-TO-PC vlan-list 100
+            ```
+
+        * No ping from 172.18.1.0/24 to 172.16.1.1
+            ```
+            RB(config)#access-list 100 deny icmp 172.18.1.0 0.0.0.255 host 172.16.1.1 echo
+            RB(config)#access-list 100 permit ip any any
+            
+            RB(config)#int gig0/1
+            RB(config-inf)#acc 100 in
+            ```
+
+        * No telnet to router RA from 172.18.1.0/24
+            ```
+            RB(config)#access-list 10 deny 172.18.1.0 0.0.0.255
+            RB(config)#access-list 10 permit any
+            
+            RB(config)#line vty 0 4
+            RB(config-line)#access-class 10 in
+            ```
+
+        * Access to HTTP Server (port: 80) only from PC2
+            ```
+            RB(config)#access-list 101 permit tcp host 172.18.1.2 host 172.16.1.1 eq 80
+            RB(config)#access-list 101 deny tcp any host 172.16.1.1 eq 80
+            RB(config)#access-list 101 permit ip any any
+            
+            RB(config)#int gig0/1
+            RB(config)#acc 101 in
+            ```
 
 * storm-control
     * Configure
@@ -387,6 +428,52 @@
     ```
     Switch(config-if)# clockrate <value>
     ```
+
+* Routing IPv6 RIPng
+    ```
+    # Global routing startup (instead of MYPROCESS you can give your name)
+    Router(config)# ipv6 router rip MYPROCESS
+    
+    # Start routing on participating interfaces
+    Router(config)# interface e0
+    Router(config-if)# ipv6 rip MYPROCESS enable
+    
+    # optional setting - change udp port from 521 to 555 and multicast group from FF02::9 to FF02::1111
+    Router(config)# ipv6 rip MYPROCESS port 555 multicast-group FF02::1111
+    ```
+
+* Configuring EIGRP routing with authentication
+    - It is worth remembering that the `key chain` must be the same only on interfaces directly connected to each other
+    ```
+	# The key creation HAS TO BE THE SAME ON EACH DEVICE
+	RouterA(config)# key chain MYCHAIN
+	RouterA(config-keychain)# key 1
+	RouterA(config-keychain-key)# key-string MYPASSWORD
+	
+	# Assigning a key to an interface
+	RouterA(config)# interface s0
+	RouterA(config-if)# ip authentication key-chain eigrp 10 MYCHAIN
+	
+	# To determine what encryption to use there's not much choice, eigrp only supports md5
+	RouterA(config)# interface s0
+	RouterA(config-if)# ip authentication mode eigrp 10 md5
+	```
+
+* Configuring RIPv2 routing with authentication
+    ```
+	# As in eigrp, we set the key
+	RouterA(config)# key chain MYCHAIN
+	RouterA(config-keychain)# key 1
+	RouterA(config-keychain-key)# key-string MYPASSWORD
+	
+	# Assigning a key to an interface
+	RouterA(config)# interface s0
+	RouterA(config-if)# ip rip authentication key-chain MYCHAIN
+
+	# Determine if we want to send the key in plaintext
+	RouterA(config)# interface s0
+	RouterA(config-if)# ip rip authentication mode md5
+	```
 
 * Static Routing
     * In static routing you add networks which the router doesn't "see" (isn't part of/isn't directly connected to)
@@ -632,16 +719,51 @@
         ```
         Router(config)# ip nat pool <pool_name> <ip_address_range_start> <ip_address_range_end> netmask <mask>
         ```
+    * Static NAT
+        * Example
+        ```
+        # Defining where the private interfaces are and where are public
+        Router(config)# int e0/0
+        Router(config-if)# ip nat inside
+        Router(config)# int s0/0
+        Router(config-if)# ip nat outside
+
+        # Mapping a private address to a public address
+        Router(config)# ip nat inside source static 172.16.1.1 158.80.1.40
+        ```
     * DNAT (Dynamic NAT)
         ```
         Router(config)# access-list <number> permit <ip_addres> <wildcard>
         Router(config)# ip nat inside source list <number> pool <pool_name>
         ```
+        * Example
+            ```
+            Router(config)# int e0/0
+            Router(config-if)# ip nat inside
+            Router(config)# int s0/0
+            Router(config-if)# ip nat outside
+            
+            # Setting up a pool of public addresses
+            Router(config)# ip nat pool POOLNAME 158.80.1.1 158.80.1.50 netmask 255.255.255.0
+            
+            # Setting up a pool of private addresses
+            Router(config)# ip nat inside source list 10 pool POOLNAME
+            Router(config)# access-list 10 permit 172.16.1.0 0.0.0.255	
+            ```
     * PAT
         ```
         Router(config)# access-list <number> permit <ip_addres> <wildcard>
         Router(config)# ip nat inside source list <number> <interface <port>|pool <pool_name>> overload
         ```
+        * Example
+            ```
+            Router(config)# int e0/0
+            Router(config-if)# ip nat inside
+            Router(config)# int s0/0
+            Router(config-if)# ip nat outside
+            Router(config)# ip nat inside source list 10 interface Serial0/0 overload
+            Router(config)# access-list 10 permit 172.16.1.0 0.0.0.255
+            ```
 
 * DNS Lookup
     * Don't translate commands to DNS requests
@@ -848,3 +970,135 @@
             ```
             Router# show zone security
             ```
+
+* IPSec Site-to-Site VPN
+    * Enabling IKE policy on the router
+        ```
+        Router(config)# crypto isakmp enable
+        Router(config)# crypto isakmp policy <priority> - lower is higher
+        ```
+    * Example policy configuration
+        ```
+        Router(config)# crypto isakmp policy <priority> - lower is higher
+        Router(config-isakmp)# hash sha
+        Router(config-isakmp)# authentication pre-share
+        Router(config-isakmp)# group 14
+        Router(config-isakmp)# lifetime 3600
+        Router(config-isakmp)# encryption aes 256
+        Router(config-isakmp)# end
+        ```
+    * Validation
+        ```
+        Router# show crypto isakmp policy
+        ```
+    * Configuring Keys
+        - IP indicates the router to which we will be tunneling
+        ```
+        Router(config)# crypto isakmp key <password> address <ip-address>
+        Router(config)# crypto ipsec transform-set 50 esp-aes 256 esp-sha-hmac
+        Router(config)# crypto ipsec security-association lifetime seconds <seconds>
+        ```
+    * Defining the traffic of interest and assigning it to the map
+        * Example ACL of traffic
+            ```
+            Router(config)# access-list <access-list-id> permit ip 192.168.1.0 0.0.0.255 192.168.3.0 0.0.0.255
+            ```
+        * Setting map for ACL
+            ```
+            Router(config)# crypto map CMAP 10 ipsec-isakmp
+            Router(config-crypto-map)# match address <access-list-id>
+            ```
+        * Setting addresses, etc
+            ```
+            Router(config-crypto-map)# set peer <ip-address>
+            Router(config-crypto-map)# set pfs <group>
+            ```
+        * Tag below must agree with `Router(config)# crypto ipsec transform-set <ID> esp-aes 256 esp-sha-hmac` in Configuring Keys
+            ```
+            Router(config-crypto-map)# set transform-set <ID>
+            Router(config-crypto-map)# set security-association lifetime seconds <seconds>
+            Router(config-crypto-map)# exit
+            ```
+        * Applying map
+            ```
+            Router(config)# interface S0/0/0
+	        Router(config-if)# crypto map CMAP
+            ```
+
+* Configuring a point-to-point tunnel - GRE VPN
+    * Configuring the interface for the GRE tunnel
+        ```
+        WEST(config)# interface tunnel 0
+        WEST(config-if)# ip address 172.16.12.1 255.255.255.252
+
+        # Source is where the package comes from
+
+        WEST(config-if)# tunnel source s0/0/0
+
+        # Dest is where we send the package
+
+        WEST(config-if)# tunnel destination 10.2.2.1 # <ip EAST>
+        
+        # Another example
+        
+        EAST(config)# interface tunnel 0
+        EAST(config-if)# ip address 172.16.12.2 255.255.255.252
+        EAST(config-if)# tunnel source 10.2.2.1
+        EAST(config-if)# tunnel destination 10.1.1.1 / <ip WEST>
+        ```
+    * Setting up routing through a GRE tunnel
+        ```
+        WEST(config)# router ospf 1
+        WEST(config-router)# network 172.16.1.0 0.0.0.255 area 0
+        WEST(config-router)# network 172.16.12.0 0.0.0.3 area 0
+        ```
+
+* Configuring IPv6 tunnels
+    * Initial setup. The tunnel will be between router A and B via IPv4
+        ```
+        RouterA(config)# ipv6 unicast-routing
+        
+        RouterA(config)# interface fa0
+        RouterA(config-if)# ipv6 address FEC0:0:0:1111::/64 eui-64
+        
+        RouterA(config)# interface fa1
+        RouterA(config-if)# ip address 10.1.1.1 255.255.0.0
+        ```
+    * Configuring tunnel
+        ```
+        RouterA(config)# interface tunnel0
+        RouterA(config-if)# no ip address
+        RouterA(config-if)# ipv6 address FEC0:0:0:2222::1/124
+        RouterA(config-if)# tunnel source fa1
+        RouterA(config-if)# tunnel destination 10.1.1.2
+        RouterA(config-if)# tunnel mode ipv6ip
+        ```
+
+* Dynamic VPN
+    * Hub configuration
+        - The `tunnel key NR` is only required when there is more than one mGRE interface on the router with the same tunnel source
+        ```
+        interface tunnel 0
+        ip address 10.0.0.254 255.255.255.0
+        tunnel source fa 0/0
+        tunnel mode gre multipoint
+        tunnel key 9999 (opcjonalnie)
+        
+        # Enabling nhrp on mgre interface
+        ip nhrp network-id 10000
+        ```
+    * Spoke configuration
+        ```
+	    interface tunnel 0
+		ip address 10.0.0.1 255.255.255.0
+		tunnel source fa 0/0
+		tunnel destination 172.16.0.254
+		tunnel key 9999 # opcjonalnie
+		ip nhrp network-id 10000
+
+		# Spoke must register with hub
+		ip nhrp nhs 10.0.0.254
+
+		# Static mapping of address and NHS to physical address
+		ip nhrp map 10.0.0.254 172.16.0.254
+        ```

@@ -111,6 +111,15 @@
          ``` Switch
         Switch(config-if)# spannig-tree guard root
         ```
+    * Nonegotiate
+        ```
+        Switch(config)# interface <interface>
+        Switch(config-if)# switchport nonegotiate
+        ```
+    * Loopguard
+        ```
+        Switch(config)# spanning-tree loopguard default
+        ```
 
 * mstp
     ``` Switch
@@ -150,7 +159,6 @@
         ``` Switch
         Switch(config-if)# spanning-tree link-type <point-to-point/shared>
         ```
-    * 
 
 * Switch Remote Access
     * Ensure you have remote access to switch
@@ -163,8 +171,8 @@
         * Setup
             * Domain setup
                 ```
-                R1(config)# ip domain-name <domain-name>
-                R1(config)# username <username> privilege 15 algorithm-type scrypt secret <password>
+                Router(config)# ip domain-name <domain-name>
+                Router(config)# username <username> privilege 15 algorithm-type scrypt secret <password>
                 ```
             * Line configuration
                 ```
@@ -183,8 +191,8 @@
                 ```
             * Optional setup
                 ```
-                R1(config)# ip ssh time-out 90
-                R1(config)# ip ssh authentication-retries 2
+                Router(config)# ip ssh time-out 90
+                Router(config)# ip ssh authentication-retries 2
                 ```
         * Switch
             ```
@@ -296,7 +304,7 @@
         ```
     * Configure aging
         ```
-        Switch(config-if)# switchport port-security aging
+        Switch(config-if)# switchport port-security aging time <time>
         ```
     * Configure port recovery
         ```
@@ -512,6 +520,7 @@
         ```
         Switch(config)# ip dhcp snooping
         Switch(config)# ip dhcp snooping vlan <vlan_list>
+        Switch(config-if)# ip dhcp snooping limit rate <number>
         Switch(config)# ip dhcp snooping verify mac-address
         Switch(config)# interface <interface>
         Switch(config-if)# ip dhcp snooping trust
@@ -576,11 +585,11 @@
             ```
     * Set password for telnet
         ```
-        R1(config)# line vty <number> <number> (0 4) - 5 sessions
-        R1(config-line)# password <password>
-        R1(config-line)# exec-timeout <minutes> <seconds>
-        R1(config-line)# transport input telnet
-        R1(config-line)# login
+        Router(config)# line vty <number> <number> (0 4) - 5 sessions
+        Router(config-line)# password <password>
+        Router(config-line)# exec-timeout <minutes> <seconds>
+        Router(config-line)# transport input telnet
+        Router(config-line)# login
         ```
         * Require password and username with specific username configuration
             ```
@@ -639,3 +648,203 @@
         ```
         Router(config)# no ip domain-lookup
         ```
+
+* Roles Configuration
+    - AAA is required for views to work properly
+    * Enabling view for root
+        ```
+        Router# enable view
+        ```
+    * Adding new views
+        ```
+        Router(config)# parser view admin1
+        Router(config-view)# secret admin1pass
+        Router(config-view)# commands ? ...
+        ```
+    * Enable specific view
+        ```
+        Router# enable view <view-name>
+        ```
+    * Example commands
+        ```
+        Router(config-view)# commands exec include all show
+        Router(config-view)# commands exec include all config terminal
+        Router(config-view)# commands exec include all debug
+
+        Router(config-view)# commands exec include show version
+        Router(config-view)# commands exec include show interfaces
+        Router(config-view)# commands exec include show ip interface brief
+        Router(config-view)# commands exec include show parser view
+        ```
+
+* Image Resistance
+    * Securing Cisco Image and archived configs
+        ```
+        Router(config)# secure boot-image
+        Router(config)# secure boot-config
+        ```
+    * Validate
+        ```
+        Router# show secure bootset
+        Router# show flash:
+        ```
+
+* Simple Network Management Protocol (SNMPv3) with ACL
+    * Creating ACL
+        ```
+        Router(config)# ip access-list standard PERMIT-SNMP
+        Router(config-std-nacl)# permit <network> <mask>
+        ```
+    * Configuring view, group and username
+        ```
+        Router(config)# snmp-server view SNMP-RO iso included
+        Router(config)# snmp-server group SNMP-G1 v3 priv read SNMP-RO access PERMIT-SNMP
+        Router(config)# snmp-server user SNMP-Admin SNMP-G1 v3 auth sha Authpass priv aes 128 Encrypass
+        ```
+    * Validation
+        ```
+        Router# show snmp group
+        Router# show snmp user
+        ```
+
+* Syslog configuration
+    * Setup
+        * Initializing NTP
+            ```
+            Router(config)# service timestamps log datetime msec
+            Router(config)# logging host <ip-address>
+            ```
+        * Setting moment of log trap
+            - 0 -> emergencies
+	        - 7 -> debugging
+            ```
+	        Router(config)# logging trap ? [0-7]
+            ```
+        * Show logging status
+            ```
+            Router# show logging
+            ```
+
+* Local authorization
+    * Creating new user
+        ```
+        Router(config)# username <username> algorithm-type scrypt secret <password>
+        ```
+    * Setup for CLI, telnet, aux
+        * CLI
+            ```
+            Router(config)# line console 0
+            Router(config-line)# login local
+            ```
+        * Telnet
+            ```
+            Router(config)# line vty <number> <number> (0 4) - 5 sessions
+            Router(config-line)# login local
+            Router(config-line)# transport input telnet
+            ```
+        * Aux
+            ```
+            Router(config)# line aux 0
+            Router(config-line)# login local
+            ```
+
+* Configuring local authorization with AAA
+    * Creating local user with highest privilege
+        ```
+        Router(config)# username <username> privilege 15 algorithm-type scrypt secret <password>
+        ```
+    * Enabling AAA service and setting as default login method
+        ```
+        Router(config)# aaa new-model
+	    Router(config)# aaa authentication login default local-case none
+        ```
+    * Requiring AAA for SSH / telnet authentication
+        ```
+        Router(config)# aaa authentication login TELNET_LINES local
+        Router(config)# line vty <number> <number> (0 4) - 5 sessions
+        Router(config-line)# login authentication TELNET_LINES
+        ```
+    * Enabling AAA debugging
+        ```
+        Router# debug aaa authentication
+        ```
+
+* Configuring a centralized authentication system using RADIUS
+    - First, we need to configure WinRadius, add some user there, etc. We can then test our configuration using RadiusTest included with WinRadius
+    * Router Configuration
+        ```
+        Router(config)# aaa new-model
+        Router(config)# aaa authentication login default group radius none
+        ```
+    * This command is used to exchange passwords between radius and router for mutual authentication
+        ```
+        Router(config-radius-server)# key WinRadius
+        ```
+    * Configure login with radius when authenticating via telnet / ssh
+        ```
+        Router(config)# aaa authentication login TELNET_LINES group radius
+        Router(config)# line vty <number> <number> (0 4) - 5 sessions
+        Router(config-line)# login authentication TELNET_LINES
+        ```
+    * Example of setting ip address
+        ```
+        Router(config)# radius server CCNAS
+        Router(config-radius-server)# address ipv4 192.168.1.3
+        ```
+
+* Configuration Zone-Based Firewall
+    * Establishment of zones. Each zone will have a different security policy, etc.
+        ```
+        Router(config)# zone security INSIDE
+        Router(config)# zone security CONFROOM
+        Router(config)# zone security INTERNET
+        ```
+    * Creation of security policies
+        - utworzenie class-map, ktore bedzie zezwalal na dany ruch z wewnatrz do internetu match-any -> wystarczy, aby tylko jeden z poniższych matchy pasował. Dla tego przykladu wyjdzie nam TCP or UDP or ICMP
+        ```
+        Router(config)# class-map type inspect match-any INSIDE_PROTOCOLS
+        Router(config-cmap)# match protocol tcp
+        Router(config-cmap)# match protocol udp
+        Router(config-cmap)# match protocol icmp
+        ```
+        * Example of protocols with higher layers
+            ```
+            Router(config)# class-map type inspect match-any CONFROOM_PROTOCOLS 
+            Router(config-cmap)# match protocol http
+            Router(config-cmap)# match protocol https
+            Router(config-cmap)# match protocol dns
+            ```
+    * After creating `class-maps`, we can create `policy-maps`. In this we assign the appropriate classes to the policy and tell what to do when the packages are zmatchowane
+        ```
+        Router(config)# policy-map type inspect INSIDE_TO_INTERNET
+        Router(config-pmap)# class type inspect INSIDE_PROTOCOLS
+        Router(config-pmap-c)# inspect
+        ```
+    * Creating zone pairs. Zone pairs give us an indication of the direction in which the security policy should operate.
+        ```
+        Router(config)# zone-pair security INSIDE_TO_INTERNET source INSIDE destination INTERNET
+        ```
+        * Validation
+            ```
+            Router# show zone-pair security
+            ```
+    * After creating all the pairs, policies, maps and other crap, we can apply the policies.
+        ```
+        Router(config)# zone-pair security INSIDE_TO_INTERNET
+        Router(config-sec-zone-pair)# service-policy type inspect INSIDE_TO_INTERNET
+        ```
+        * More detailed policy information
+            ```
+            Router# show policy-map type inspect zone-pair
+            ```
+    * After applying the policies, we can assign the appropriate interfaces to the zone
+        ```
+        Router(config)# interface <interface>
+        Router(config-if)# zone-member security INSIDE
+        Router(config)# interface <interface>
+        Router(config-if)# zone-member security INTERNET
+        ```
+        * Validate
+            ```
+            Router# show zone security
+            ```

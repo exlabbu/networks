@@ -1,8 +1,9 @@
 * vlan
-    ``` Switch
-    Switch(config)# vlan <number>
-    Switch(config-vlan)# exit
-    ``` 
+    * Creating a vlan
+        ```
+        Switch(config)# vlan <number>
+        Switch(config-vlan)# exit
+        ```
     * Port assignment
         * RoaS (Router on a Stick)
             Allows for communication between vlans which have had an interface(subinterface) made for them
@@ -35,6 +36,7 @@
         ``` Switch
         Switch(config-vlan)# name <name>
         ```
+
 * vtp
     ``` Switch
     Switch(config)# vtp mode <vtp mode>
@@ -51,6 +53,7 @@
     ``` Switch
     Switch(config)# vtp pruning
     ```
+
 * stp
     * Root node
         ``` Switch
@@ -108,6 +111,7 @@
          ``` Switch
         Switch(config-if)# spannig-tree guard root
         ```
+
 * mstp
     ``` Switch
     Switch(config)# spanning-tree mst configuration
@@ -147,24 +151,52 @@
         Switch(config-if)# spanning-tree link-type <point-to-point/shared>
         ```
     * 
+
 * Switch Remote Access
-    Ensure you have remote access to switch
-    ``` Switch
-    Switch(config)# int vlan <vlan>
-    Switch(config-if)# ip add <ip_address> <mask>
-    #OPTIONAL Switch(config)# ip default-gateway <ip_address_of_your_default_gateway>
-    ```
-    * ssh
+    * Ensure you have remote access to switch
         ``` Switch
-        Switch(config)# enable <password|secret> <your_password>
-        Switch(config)# ip domain-name <name>
-        Switch(config)# crypto key generate rsa
-        Switch(config)# ip ssh version 2
-        Switch(config)# line vty <console_line_range>
-        Switch(config-line)# transport input ssh
-        Switch(config-line)# password <your_password>
-        Switch(config-line)# login
+        Switch(config)# int vlan <vlan>
+        Switch(config-if)# ip add <ip_address> <mask>
+        #OPTIONAL Switch(config)# ip default-gateway <ip_address_of_your_default_gateway>
         ```
+    * ssh
+        * Setup
+            * Domain setup
+                ```
+                R1(config)# ip domain-name <domain-name>
+                R1(config)# username <username> privilege 15 algorithm-type scrypt secret <password>
+                ```
+            * Line configuration
+                ```
+                Router(config)# line vty <number> <number> (0 4) - 5 sessions
+                Router(config-line)# privilege level 15
+                Router(config-line)# login local
+                Router(config-line)# transport input ssh
+                ```
+            * Keys generation
+                ```
+                Router(config)# crypto key generate rsa general-keys modulus 1024
+                ```
+            * Setting up ssh version
+                ```
+                Router(config)# ip ssh version 2
+                ```
+            * Optional setup
+                ```
+                R1(config)# ip ssh time-out 90
+                R1(config)# ip ssh authentication-retries 2
+                ```
+        * Switch
+            ```
+            Switch(config)# enable <password|secret> <your_password>
+            Switch(config)# ip domain-name <name>
+            Switch(config)# crypto key generate rsa
+            Switch(config)# ip ssh version 2
+            Switch(config)# line vty <console_line_range>
+            Switch(config-line)# transport input ssh
+            Switch(config-line)# password <your_password>
+            Switch(config-line)# login
+            ```
     * telnet
         ``` Switch
         Switch(config)# enable <password|secret> <your_password>
@@ -174,6 +206,23 @@
 
         Switch(config-line)# transport input telnet
         ```
+    * scp (Secure Copy)
+        * Setup
+            * Enabling aaa and setting it for default authorization and authentication
+                ```
+                Router(config)# aaa new-model
+                Router(config)# aaa authentication login default local
+                Router(config)# aaa authorization exec default local
+                ```
+            * Enabling scp
+                ```
+                Router(config)# ip scp server enable
+                ```
+        * Usage
+            ```
+            Router# copy scp: flash:
+            ```
+
 * ACL (Access Lists)
     * Standard ACL
         ``` Switch
@@ -192,7 +241,6 @@
         * `established`
             This option can be applayed even if we specified ports in command
 
-            
         Options for ICMP
         * `echo`
         * `echo-reply`
@@ -200,10 +248,6 @@
         ``` Switch
         Switch(config-if)# ip access-group <acl_number> <in|out>
         ```
-
-
-
-
 
 * storm-control
     * Configure
@@ -218,6 +262,7 @@
         ```
         Switch# show storm-control <interface> 
         ```
+
 * protected port
     * Configure
         ```
@@ -228,6 +273,7 @@
         ```
         Switch# show interfaces <interface> switchport
         ```
+
 * port blocking
     * Configure
         ```
@@ -237,6 +283,7 @@
         ```
         Switch# show interfaces <interface> switchport
         ```
+
 * port-security
     * Configure
         ```
@@ -262,6 +309,7 @@
         Switch# show port-security <address>
         Switch# show port-security interface <interface>
         ```
+
 * EtherChannel
     * Configure
         ```
@@ -284,6 +332,7 @@
         ```
         Switch# show interfaces status err-disabled
         ```
+
 * SPAN (Switched Port Analyzer)
     * Delete all existing
         ```
@@ -321,33 +370,37 @@
         Switch# show monitor
         Switch# show monitor session <session>
         ```
+
 * Serial interfaces
-    On Serial Interfaces you can additionally to normal configuration set "clockrate".
-    Only 1 out of the 2 ports in a connection needs this set (DCE)
-    It's syntax allows from 300 to 8'000'000 but will adjust it to closest supported standardised amount but on older devices might not work automatically
+    1. On Serial Interfaces you can additionally to normal configuration set "clockrate".
+    2. Only 1 out of the 2 ports in a connection needs this set (DCE)
+    3. It's syntax allows from 300 to 8'000'000 but will adjust it to closest supported standardised amount but on older devices might not work automatically
+
     ```
     Switch(config-if)# clockrate <value>
     ```
+
 * Static Routing
-    In static routing you add networks which the router doesn't "see" (isn't part of/isn't directly connected to)
-    * Configure
-        ```
-        Router(config)# ip route <destination_network_ip_address> <destination_network_mask> <next_hop>
-        ```
-        <next_hop> - This can be either:
-        a) the interface name of the router this command is being executed on which will be used to get to the <destination_ip> network
-        b) ip address of the neighbour's interface which will be used to get to the <destination_ip> network
-        The choice which should be used depends on which connection type is between routers (serial - better use own exit interface name, Ethernet - better to use neighbour's interface address)
-    * Configure default route
-        ```
-        Router(config)# ip route 0.0.0.0 0.0.0.0 <next_hop>
-        ```
-    * Check/show
-        ```
-        Router# show ip route
-        ```
+    * In static routing you add networks which the router doesn't "see" (isn't part of/isn't directly connected to)
+        * Configure
+            ```
+            Router(config)# ip route <destination_network_ip_address> <destination_network_mask> <next_hop>
+            ```
+            <next_hop> - This can be either:
+            a) the interface name of the router this command is being executed on which will be used to get to the <destination_ip> network
+            b) ip address of the neighbour's interface which will be used to get to the <destination_ip> network
+            The choice which should be used depends on which connection type is between routers (serial - better use own exit interface name, Ethernet - better to use neighbour's interface address)
+        * Configure default route
+            ```
+            Router(config)# ip route 0.0.0.0 0.0.0.0 <next_hop>
+            ```
+        * Check/show
+            ```
+            Router# show ip route
+            ```
+
 * Dynamic Routing
-    In dynamic routing you add networks which the router "sees" (is part of/is directly connected to) and you want it to "tell" other routers about
+    - In dynamic routing you add networks which the router "sees" (is part of/is directly connected to) and you want it to "tell" other routers about
     * RIP (v2)
         * Configure
             ```
@@ -380,15 +433,32 @@
         * Check/show
             ```
             Router# show ip route
-            ```    
-    
+            ```
     * OSPF
         ```
          Router(config)# router ospf <process_id>
          Router(config-router)# network <network_address> <wildcard> area <area_number>
+         Router(config-router)# passive-interface g0/1
         ```
+
+        Example
+
+        ```
+        Router(config)# router ospf 1
+        Router(config-router)# network 192.168.1.0 0.0.0.255 area 0
+        Router(config-router)# network 10.1.1.0 0.0.0.3 area 0
+        Router(config-router)# passive-interface <interface>
+        ```
+
+        Check routing configuration
+
+        ```
+        Router# show ip ospf neighbor
+        Router# show ip route
+        ```
+
 * DHCP
-    Order in which u do exclusion,binding and common pools matter (first exclusion/binding then common pools)
+    - Order in which u do exclusion, binding and common pools matter (first exclusion/binding then common pools)
     * Binding
         ```
         Router(config)# ip dhcp pool <name>
@@ -423,11 +493,13 @@
         Router(config)# service dhcp
         ```
     * Remote DHCP
-        Set this on the router which is the gateway of a network which will take addresses from DHCP on the gateway interface
+        - Set this on the router which is the gateway of a network which will take addresses from DHCP on the gateway interface
+
         ```
         Router(config-if)# ip helper-address <ip address>
         ```
-        <ip address> - address of the DHCP router's interface which router - on which the command is executed - communicates through
+
+        - <ip address> address of the DHCP router's interface which router - on which the command is executed - communicates through
     * Check/show
         ```
             Router# show ip interfaces
@@ -446,8 +518,9 @@
         Switch# show running-config dhcp
         Switch# show ip dhcp snooping
         ```
+
 * Overall config/ Passwords
-    Can be done both on a switch and a router
+    - Can be done both on a switch and a router
     * Show current configuration
         ```
         # show running-config
@@ -466,17 +539,61 @@
         Router(config-if)# ip address <address> <mask>
         Router(config-if)# no shutdown
         ```
+    * Do not store password in plan text
+        ```
+        Router(config)# service password-enryption
+        ```
+    * Set minimum length of password
+        ```
+        Router(config)# security passwords min-length <number>
+        ```
+    * Set password when typing enable
+        ```
+        Router(config)# enable algorithm-type scrypt secret <password>
+        ```
     * Password to login to CLI on console connection
         ```
-        (config)# line console 0
-        (config-line)# password <password>
-        (config-line)# login
+        Router(config)# line console 0
+        Router(config-line)# password <password>
+        Router(config-line)# exec-timeout <minutes> <seconds>
+        Router(config-line)# login
+        Router(config-line)# logging synchronous
         ```
-* password enryption
-    ```
-    (config)#service password-enryption
-    ```
-
+        * Require password and username with specific username configuration
+            ```
+            Router(config-line)# login local
+            ```
+    * Set password for AUX port
+        ```
+        Router(config)# line aux 0
+        Router(config-line)# password <password>
+        Router(config-line)# exec-timeout <minutes> <seconds>
+        Router(config-line)# login
+        ```
+        * Require password and username with specific username configuration
+            ```
+            Router(config-line)# login local
+            ```
+    * Set password for telnet
+        ```
+        R1(config)# line vty <number> <number> (0 4) - 5 sessions
+        R1(config-line)# password <password>
+        R1(config-line)# exec-timeout <minutes> <seconds>
+        R1(config-line)# transport input telnet
+        R1(config-line)# login
+        ```
+        * Require password and username with specific username configuration
+            ```
+            Router(config-line)# login local
+            ````
+    * Setting banner for login screen
+        ```
+        Router(config)# banner motd $Wir mussen die Juden ausrotten$
+        ```
+    * Create new user
+        ```
+        Router(config)# username <username> algorithm-type scrypt secret <password>
+        ```
 
 * logging/remote logging
     ```
@@ -485,12 +602,15 @@
     Router(config)# service timestamps log datetime year
     Router(config)# service sequence-numbers
     ```
+
     On default levels, logs will be send to logging host
+
     ```
     Router(config)# logging console <level>
     Router(config)# logging monitor <level>
     Router(config)# logging trap <level>
     ```
+
 * NAT/PAT (Network Address Translation/Port Address Translation)
     * Specify inside and outside ports
         ```
@@ -512,4 +632,10 @@
         ```
         Router(config)# access-list <number> permit <ip_addres> <wildcard>
         Router(config)# ip nat inside source list <number> <interface <port>|pool <pool_name>> overload
+        ```
+
+* DNS Lookup
+    * Don't translate commands to DNS requests
+        ```
+        Router(config)# no ip domain-lookup
         ```

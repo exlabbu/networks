@@ -1,8 +1,9 @@
 * vlan
-    ``` Switch
-    Switch(config)# vlan <number>
-    Switch(config-vlan)# exit
-    ``` 
+    * Creating a vlan
+        ```
+        Switch(config)# vlan <number>
+        Switch(config-vlan)# exit
+        ```
     * Port assignment
         * RoaS (Router on a Stick)
             Allows for communication between vlans which have had an interface(subinterface) made for them
@@ -35,6 +36,7 @@
         ``` Switch
         Switch(config-vlan)# name <name>
         ```
+
 * vtp
     ``` Switch
     Switch(config)# vtp mode <vtp mode>
@@ -51,6 +53,7 @@
     ``` Switch
     Switch(config)# vtp pruning
     ```
+
 * stp
     * Root node
         ``` Switch
@@ -108,6 +111,16 @@
          ``` Switch
         Switch(config-if)# spannig-tree guard root
         ```
+    * Nonegotiate
+        ```
+        Switch(config)# interface <interface>
+        Switch(config-if)# switchport nonegotiate
+        ```
+    * Loopguard
+        ```
+        Switch(config)# spanning-tree loopguard default
+        ```
+
 * mstp
     ``` Switch
     Switch(config)# spanning-tree mst configuration
@@ -146,25 +159,52 @@
         ``` Switch
         Switch(config-if)# spanning-tree link-type <point-to-point/shared>
         ```
-    * 
+
 * Switch Remote Access
-    Ensure you have remote access to switch
-    ``` Switch
-    Switch(config)# int vlan <vlan>
-    Switch(config-if)# ip add <ip_address> <mask>
-    #OPTIONAL Switch(config)# ip default-gateway <ip_address_of_your_default_gateway>
-    ```
-    * ssh
+    * Ensure you have remote access to switch
         ``` Switch
-        Switch(config)# enable <password|secret> <your_password>
-        Switch(config)# ip domain-name <name>
-        Switch(config)# crypto key generate rsa
-        Switch(config)# ip ssh version 2
-        Switch(config)# line vty <console_line_range>
-        Switch(config-line)# transport input ssh
-        Switch(config-line)# password <your_password>
-        Switch(config-line)# login
+        Switch(config)# int vlan <vlan>
+        Switch(config-if)# ip add <ip_address> <mask>
+        #OPTIONAL Switch(config)# ip default-gateway <ip_address_of_your_default_gateway>
         ```
+    * ssh
+        * Setup
+            * Domain setup
+                ```
+                Router(config)# ip domain-name <domain-name>
+                Router(config)# username <username> privilege 15 algorithm-type scrypt secret <password>
+                ```
+            * Line configuration
+                ```
+                Router(config)# line vty <number> <number> (0 4) - 5 sessions
+                Router(config-line)# privilege level 15
+                Router(config-line)# login local
+                Router(config-line)# transport input ssh
+                ```
+            * Keys generation
+                ```
+                Router(config)# crypto key generate rsa general-keys modulus 1024
+                ```
+            * Setting up ssh version
+                ```
+                Router(config)# ip ssh version 2
+                ```
+            * Optional setup
+                ```
+                Router(config)# ip ssh time-out 90
+                Router(config)# ip ssh authentication-retries 2
+                ```
+        * Switch
+            ```
+            Switch(config)# enable <password|secret> <your_password>
+            Switch(config)# ip domain-name <name>
+            Switch(config)# crypto key generate rsa
+            Switch(config)# ip ssh version 2
+            Switch(config)# line vty <console_line_range>
+            Switch(config-line)# transport input ssh
+            Switch(config-line)# password <your_password>
+            Switch(config-line)# login
+            ```
     * telnet
         ``` Switch
         Switch(config)# enable <password|secret> <your_password>
@@ -174,6 +214,23 @@
 
         Switch(config-line)# transport input telnet
         ```
+    * scp (Secure Copy)
+        * Setup
+            * Enabling aaa and setting it for default authorization and authentication
+                ```
+                Router(config)# aaa new-model
+                Router(config)# aaa authentication login default local
+                Router(config)# aaa authorization exec default local
+                ```
+            * Enabling scp
+                ```
+                Router(config)# ip scp server enable
+                ```
+        * Usage
+            ```
+            Router# copy scp: flash:
+            ```
+
 * ACL (Access Lists)
     * Standard ACL
         ``` Switch
@@ -192,7 +249,6 @@
         * `established`
             This option can be applayed even if we specified ports in command
 
-            
         Options for ICMP
         * `echo`
         * `echo-reply`
@@ -200,10 +256,47 @@
         ``` Switch
         Switch(config-if)# ip access-group <acl_number> <in|out>
         ```
+    * Examples
+        * PC2 is unable to communicate with computer PC3 but should be able to communicate with Router RB
+            ```
+            SW1(config)#access-list 100 permit ip host 172.18.1.2 host 172.18.1.3
+            
+            SW1(config)#vlan access-map NOT-TO-PC 10
+            SW1(config-access-map)#match ip address 100
+            SW1(config-access-map)#action drop
+            SW1(config-access-map)#vlan access-map NOT-TO-PC 20
+            SW1(config-access-map)#action forward
+            
+            SW1(config)#vlan filter NOT-TO-PC vlan-list 100
+            ```
 
+        * No ping from 172.18.1.0/24 to 172.16.1.1
+            ```
+            RB(config)#access-list 100 deny icmp 172.18.1.0 0.0.0.255 host 172.16.1.1 echo
+            RB(config)#access-list 100 permit ip any any
+            
+            RB(config)#int gig0/1
+            RB(config-inf)#acc 100 in
+            ```
 
+        * No telnet to router RA from 172.18.1.0/24
+            ```
+            RB(config)#access-list 10 deny 172.18.1.0 0.0.0.255
+            RB(config)#access-list 10 permit any
+            
+            RB(config)#line vty 0 4
+            RB(config-line)#access-class 10 in
+            ```
 
-
+        * Access to HTTP Server (port: 80) only from PC2
+            ```
+            RB(config)#access-list 101 permit tcp host 172.18.1.2 host 172.16.1.1 eq 80
+            RB(config)#access-list 101 deny tcp any host 172.16.1.1 eq 80
+            RB(config)#access-list 101 permit ip any any
+            
+            RB(config)#int gig0/1
+            RB(config)#acc 101 in
+            ```
 
 * storm-control
     * Configure
@@ -218,6 +311,7 @@
         ```
         Switch# show storm-control <interface> 
         ```
+
 * protected port
     * Configure
         ```
@@ -228,6 +322,7 @@
         ```
         Switch# show interfaces <interface> switchport
         ```
+
 * port blocking
     * Configure
         ```
@@ -237,6 +332,7 @@
         ```
         Switch# show interfaces <interface> switchport
         ```
+
 * port-security
     * Configure
         ```
@@ -249,7 +345,7 @@
         ```
     * Configure aging
         ```
-        Switch(config-if)# switchport port-security aging
+        Switch(config-if)# switchport port-security aging time <time>
         ```
     * Configure port recovery
         ```
@@ -262,6 +358,7 @@
         Switch# show port-security <address>
         Switch# show port-security interface <interface>
         ```
+
 * EtherChannel
     * Configure
         ```
@@ -284,6 +381,7 @@
         ```
         Switch# show interfaces status err-disabled
         ```
+
 * SPAN (Switched Port Analyzer)
     * Delete all existing
         ```
@@ -321,33 +419,83 @@
         Switch# show monitor
         Switch# show monitor session <session>
         ```
+
 * Serial interfaces
-    On Serial Interfaces you can additionally to normal configuration set "clockrate".
-    Only 1 out of the 2 ports in a connection needs this set (DCE)
-    It's syntax allows from 300 to 8'000'000 but will adjust it to closest supported standardised amount but on older devices might not work automatically
+    1. On Serial Interfaces you can additionally to normal configuration set "clockrate".
+    2. Only 1 out of the 2 ports in a connection needs this set (DCE)
+    3. It's syntax allows from 300 to 8'000'000 but will adjust it to closest supported standardised amount but on older devices might not work automatically
+
     ```
     Switch(config-if)# clockrate <value>
     ```
+
+* Routing IPv6 RIPng
+    ```
+    # Global routing startup (instead of MYPROCESS you can give your name)
+    Router(config)# ipv6 router rip MYPROCESS
+    
+    # Start routing on participating interfaces
+    Router(config)# interface e0
+    Router(config-if)# ipv6 rip MYPROCESS enable
+    
+    # optional setting - change udp port from 521 to 555 and multicast group from FF02::9 to FF02::1111
+    Router(config)# ipv6 rip MYPROCESS port 555 multicast-group FF02::1111
+    ```
+
+* Configuring EIGRP routing with authentication
+    - It is worth remembering that the `key chain` must be the same only on interfaces directly connected to each other
+    ```
+	# The key creation HAS TO BE THE SAME ON EACH DEVICE
+	RouterA(config)# key chain MYCHAIN
+	RouterA(config-keychain)# key 1
+	RouterA(config-keychain-key)# key-string MYPASSWORD
+	
+	# Assigning a key to an interface
+	RouterA(config)# interface s0
+	RouterA(config-if)# ip authentication key-chain eigrp 10 MYCHAIN
+	
+	# To determine what encryption to use there's not much choice, eigrp only supports md5
+	RouterA(config)# interface s0
+	RouterA(config-if)# ip authentication mode eigrp 10 md5
+	```
+
+* Configuring RIPv2 routing with authentication
+    ```
+	# As in eigrp, we set the key
+	RouterA(config)# key chain MYCHAIN
+	RouterA(config-keychain)# key 1
+	RouterA(config-keychain-key)# key-string MYPASSWORD
+	
+	# Assigning a key to an interface
+	RouterA(config)# interface s0
+	RouterA(config-if)# ip rip authentication key-chain MYCHAIN
+
+	# Determine if we want to send the key in plaintext
+	RouterA(config)# interface s0
+	RouterA(config-if)# ip rip authentication mode md5
+	```
+
 * Static Routing
-    In static routing you add networks which the router doesn't "see" (isn't part of/isn't directly connected to)
-    * Configure
-        ```
-        Router(config)# ip route <destination_network_ip_address> <destination_network_mask> <next_hop>
-        ```
-        <next_hop> - This can be either:
-        a) the interface name of the router this command is being executed on which will be used to get to the <destination_ip> network
-        b) ip address of the neighbour's interface which will be used to get to the <destination_ip> network
-        The choice which should be used depends on which connection type is between routers (serial - better use own exit interface name, Ethernet - better to use neighbour's interface address)
-    * Configure default route
-        ```
-        Router(config)# ip route 0.0.0.0 0.0.0.0 <next_hop>
-        ```
-    * Check/show
-        ```
-        Router# show ip route
-        ```
+    * In static routing you add networks which the router doesn't "see" (isn't part of/isn't directly connected to)
+        * Configure
+            ```
+            Router(config)# ip route <destination_network_ip_address> <destination_network_mask> <next_hop>
+            ```
+            <next_hop> - This can be either:
+            a) the interface name of the router this command is being executed on which will be used to get to the <destination_ip> network
+            b) ip address of the neighbour's interface which will be used to get to the <destination_ip> network
+            The choice which should be used depends on which connection type is between routers (serial - better use own exit interface name, Ethernet - better to use neighbour's interface address)
+        * Configure default route
+            ```
+            Router(config)# ip route 0.0.0.0 0.0.0.0 <next_hop>
+            ```
+        * Check/show
+            ```
+            Router# show ip route
+            ```
+
 * Dynamic Routing
-    In dynamic routing you add networks which the router "sees" (is part of/is directly connected to) and you want it to "tell" other routers about
+    - In dynamic routing you add networks which the router "sees" (is part of/is directly connected to) and you want it to "tell" other routers about
     * RIP (v2)
         * Configure
             ```
@@ -380,15 +528,32 @@
         * Check/show
             ```
             Router# show ip route
-            ```    
-    
+            ```
     * OSPF
         ```
          Router(config)# router ospf <process_id>
          Router(config-router)# network <network_address> <wildcard> area <area_number>
+         Router(config-router)# passive-interface g0/1
         ```
+
+        Example
+
+        ```
+        Router(config)# router ospf 1
+        Router(config-router)# network 192.168.1.0 0.0.0.255 area 0
+        Router(config-router)# network 10.1.1.0 0.0.0.3 area 0
+        Router(config-router)# passive-interface <interface>
+        ```
+
+        Check routing configuration
+
+        ```
+        Router# show ip ospf neighbor
+        Router# show ip route
+        ```
+
 * DHCP
-    Order in which u do exclusion,binding and common pools matter (first exclusion/binding then common pools)
+    - Order in which u do exclusion, binding and common pools matter (first exclusion/binding then common pools)
     * Binding
         ```
         Router(config)# ip dhcp pool <name>
@@ -423,11 +588,13 @@
         Router(config)# service dhcp
         ```
     * Remote DHCP
-        Set this on the router which is the gateway of a network which will take addresses from DHCP on the gateway interface
+        - Set this on the router which is the gateway of a network which will take addresses from DHCP on the gateway interface
+
         ```
         Router(config-if)# ip helper-address <ip address>
         ```
-        <ip address> - address of the DHCP router's interface which router - on which the command is executed - communicates through
+
+        - <ip address> address of the DHCP router's interface which router - on which the command is executed - communicates through
     * Check/show
         ```
             Router# show ip interfaces
@@ -440,14 +607,16 @@
         ```
         Switch(config)# ip dhcp snooping
         Switch(config)# ip dhcp snooping vlan <vlan_list>
+        Switch(config-if)# ip dhcp snooping limit rate <number>
         Switch(config)# ip dhcp snooping verify mac-address
         Switch(config)# interface <interface>
         Switch(config-if)# ip dhcp snooping trust
         Switch# show running-config dhcp
         Switch# show ip dhcp snooping
         ```
+
 * Overall config/ Passwords
-    Can be done both on a switch and a router
+    - Can be done both on a switch and a router
     * Show current configuration
         ```
         # show running-config
@@ -466,17 +635,61 @@
         Router(config-if)# ip address <address> <mask>
         Router(config-if)# no shutdown
         ```
+    * Do not store password in plan text
+        ```
+        Router(config)# service password-enryption
+        ```
+    * Set minimum length of password
+        ```
+        Router(config)# security passwords min-length <number>
+        ```
+    * Set password when typing enable
+        ```
+        Router(config)# enable algorithm-type scrypt secret <password>
+        ```
     * Password to login to CLI on console connection
         ```
-        (config)# line console 0
-        (config-line)# password <password>
-        (config-line)# login
+        Router(config)# line console 0
+        Router(config-line)# password <password>
+        Router(config-line)# exec-timeout <minutes> <seconds>
+        Router(config-line)# login
+        Router(config-line)# logging synchronous
         ```
-* password enryption
-    ```
-    (config)#service password-enryption
-    ```
-
+        * Require password and username with specific username configuration
+            ```
+            Router(config-line)# login local
+            ```
+    * Set password for AUX port
+        ```
+        Router(config)# line aux 0
+        Router(config-line)# password <password>
+        Router(config-line)# exec-timeout <minutes> <seconds>
+        Router(config-line)# login
+        ```
+        * Require password and username with specific username configuration
+            ```
+            Router(config-line)# login local
+            ```
+    * Set password for telnet
+        ```
+        Router(config)# line vty <number> <number> (0 4) - 5 sessions
+        Router(config-line)# password <password>
+        Router(config-line)# exec-timeout <minutes> <seconds>
+        Router(config-line)# transport input telnet
+        Router(config-line)# login
+        ```
+        * Require password and username with specific username configuration
+            ```
+            Router(config-line)# login local
+            ````
+    * Setting banner for login screen
+        ```
+        Router(config)# banner motd $Wir mussen die Juden ausrotten$
+        ```
+    * Create new user
+        ```
+        Router(config)# username <username> algorithm-type scrypt secret <password>
+        ```
 
 * logging/remote logging
     ```
@@ -485,12 +698,15 @@
     Router(config)# service timestamps log datetime year
     Router(config)# service sequence-numbers
     ```
+
     On default levels, logs will be send to logging host
+
     ```
     Router(config)# logging console <level>
     Router(config)# logging monitor <level>
     Router(config)# logging trap <level>
     ```
+
 * NAT/PAT (Network Address Translation/Port Address Translation)
     * Specify inside and outside ports
         ```
@@ -503,13 +719,386 @@
         ```
         Router(config)# ip nat pool <pool_name> <ip_address_range_start> <ip_address_range_end> netmask <mask>
         ```
+    * Static NAT
+        * Example
+        ```
+        # Defining where the private interfaces are and where are public
+        Router(config)# int e0/0
+        Router(config-if)# ip nat inside
+        Router(config)# int s0/0
+        Router(config-if)# ip nat outside
+
+        # Mapping a private address to a public address
+        Router(config)# ip nat inside source static 172.16.1.1 158.80.1.40
+        ```
     * DNAT (Dynamic NAT)
         ```
         Router(config)# access-list <number> permit <ip_addres> <wildcard>
         Router(config)# ip nat inside source list <number> pool <pool_name>
         ```
+        * Example
+            ```
+            Router(config)# int e0/0
+            Router(config-if)# ip nat inside
+            Router(config)# int s0/0
+            Router(config-if)# ip nat outside
+            
+            # Setting up a pool of public addresses
+            Router(config)# ip nat pool POOLNAME 158.80.1.1 158.80.1.50 netmask 255.255.255.0
+            
+            # Setting up a pool of private addresses
+            Router(config)# ip nat inside source list 10 pool POOLNAME
+            Router(config)# access-list 10 permit 172.16.1.0 0.0.0.255	
+            ```
     * PAT
         ```
         Router(config)# access-list <number> permit <ip_addres> <wildcard>
         Router(config)# ip nat inside source list <number> <interface <port>|pool <pool_name>> overload
+        ```
+        * Example
+            ```
+            Router(config)# int e0/0
+            Router(config-if)# ip nat inside
+            Router(config)# int s0/0
+            Router(config-if)# ip nat outside
+            Router(config)# ip nat inside source list 10 interface Serial0/0 overload
+            Router(config)# access-list 10 permit 172.16.1.0 0.0.0.255
+            ```
+
+* DNS Lookup
+    * Don't translate commands to DNS requests
+        ```
+        Router(config)# no ip domain-lookup
+        ```
+
+* Roles Configuration
+    - AAA is required for views to work properly
+    * Enabling view for root
+        ```
+        Router# enable view
+        ```
+    * Adding new views
+        ```
+        Router(config)# parser view admin1
+        Router(config-view)# secret admin1pass
+        Router(config-view)# commands ? ...
+        ```
+    * Enable specific view
+        ```
+        Router# enable view <view-name>
+        ```
+    * Example commands
+        ```
+        Router(config-view)# commands exec include all show
+        Router(config-view)# commands exec include all config terminal
+        Router(config-view)# commands exec include all debug
+
+        Router(config-view)# commands exec include show version
+        Router(config-view)# commands exec include show interfaces
+        Router(config-view)# commands exec include show ip interface brief
+        Router(config-view)# commands exec include show parser view
+        ```
+
+* Image Resistance
+    * Securing Cisco Image and archived configs
+        ```
+        Router(config)# secure boot-image
+        Router(config)# secure boot-config
+        ```
+    * Validate
+        ```
+        Router# show secure bootset
+        Router# show flash:
+        ```
+
+* Simple Network Management Protocol (SNMPv3) with ACL
+    * Creating ACL
+        ```
+        Router(config)# ip access-list standard PERMIT-SNMP
+        Router(config-std-nacl)# permit <network> <mask>
+        ```
+    * Configuring view, group and username
+        ```
+        Router(config)# snmp-server view SNMP-RO iso included
+        Router(config)# snmp-server group SNMP-G1 v3 priv read SNMP-RO access PERMIT-SNMP
+        Router(config)# snmp-server user SNMP-Admin SNMP-G1 v3 auth sha Authpass priv aes 128 Encrypass
+        ```
+    * Validation
+        ```
+        Router# show snmp group
+        Router# show snmp user
+        ```
+
+* Syslog configuration
+    * Setup
+        * Initializing NTP
+            ```
+            Router(config)# service timestamps log datetime msec
+            Router(config)# logging host <ip-address>
+            ```
+        * Setting moment of log trap
+            - 0 -> emergencies
+	        - 7 -> debugging
+            ```
+	        Router(config)# logging trap ? [0-7]
+            ```
+        * Show logging status
+            ```
+            Router# show logging
+            ```
+
+* Local authorization
+    * Creating new user
+        ```
+        Router(config)# username <username> algorithm-type scrypt secret <password>
+        ```
+    * Setup for CLI, telnet, aux
+        * CLI
+            ```
+            Router(config)# line console 0
+            Router(config-line)# login local
+            ```
+        * Telnet
+            ```
+            Router(config)# line vty <number> <number> (0 4) - 5 sessions
+            Router(config-line)# login local
+            Router(config-line)# transport input telnet
+            ```
+        * Aux
+            ```
+            Router(config)# line aux 0
+            Router(config-line)# login local
+            ```
+
+* Configuring local authorization with AAA
+    * Creating local user with highest privilege
+        ```
+        Router(config)# username <username> privilege 15 algorithm-type scrypt secret <password>
+        ```
+    * Enabling AAA service and setting as default login method
+        ```
+        Router(config)# aaa new-model
+	    Router(config)# aaa authentication login default local-case none
+        ```
+    * Requiring AAA for SSH / telnet authentication
+        ```
+        Router(config)# aaa authentication login TELNET_LINES local
+        Router(config)# line vty <number> <number> (0 4) - 5 sessions
+        Router(config-line)# login authentication TELNET_LINES
+        ```
+    * Enabling AAA debugging
+        ```
+        Router# debug aaa authentication
+        ```
+
+* Configuring a centralized authentication system using RADIUS
+    - First, we need to configure WinRadius, add some user there, etc. We can then test our configuration using RadiusTest included with WinRadius
+    * Router Configuration
+        ```
+        Router(config)# aaa new-model
+        Router(config)# aaa authentication login default group radius none
+        ```
+    * This command is used to exchange passwords between radius and router for mutual authentication
+        ```
+        Router(config-radius-server)# key WinRadius
+        ```
+    * Configure login with radius when authenticating via telnet / ssh
+        ```
+        Router(config)# aaa authentication login TELNET_LINES group radius
+        Router(config)# line vty <number> <number> (0 4) - 5 sessions
+        Router(config-line)# login authentication TELNET_LINES
+        ```
+    * Example of setting ip address
+        ```
+        Router(config)# radius server CCNAS
+        Router(config-radius-server)# address ipv4 192.168.1.3
+        ```
+
+* Configuration Zone-Based Firewall
+    * Establishment of zones. Each zone will have a different security policy, etc.
+        ```
+        Router(config)# zone security INSIDE
+        Router(config)# zone security CONFROOM
+        Router(config)# zone security INTERNET
+        ```
+    * Creation of security policies
+        - utworzenie class-map, ktore bedzie zezwalal na dany ruch z wewnatrz do internetu match-any -> wystarczy, aby tylko jeden z poniższych matchy pasował. Dla tego przykladu wyjdzie nam TCP or UDP or ICMP
+        ```
+        Router(config)# class-map type inspect match-any INSIDE_PROTOCOLS
+        Router(config-cmap)# match protocol tcp
+        Router(config-cmap)# match protocol udp
+        Router(config-cmap)# match protocol icmp
+        ```
+        * Example of protocols with higher layers
+            ```
+            Router(config)# class-map type inspect match-any CONFROOM_PROTOCOLS 
+            Router(config-cmap)# match protocol http
+            Router(config-cmap)# match protocol https
+            Router(config-cmap)# match protocol dns
+            ```
+    * After creating `class-maps`, we can create `policy-maps`. In this we assign the appropriate classes to the policy and tell what to do when the packages are zmatchowane
+        ```
+        Router(config)# policy-map type inspect INSIDE_TO_INTERNET
+        Router(config-pmap)# class type inspect INSIDE_PROTOCOLS
+        Router(config-pmap-c)# inspect
+        ```
+    * Creating zone pairs. Zone pairs give us an indication of the direction in which the security policy should operate.
+        ```
+        Router(config)# zone-pair security INSIDE_TO_INTERNET source INSIDE destination INTERNET
+        ```
+        * Validation
+            ```
+            Router# show zone-pair security
+            ```
+    * After creating all the pairs, policies, maps and other crap, we can apply the policies.
+        ```
+        Router(config)# zone-pair security INSIDE_TO_INTERNET
+        Router(config-sec-zone-pair)# service-policy type inspect INSIDE_TO_INTERNET
+        ```
+        * More detailed policy information
+            ```
+            Router# show policy-map type inspect zone-pair
+            ```
+    * After applying the policies, we can assign the appropriate interfaces to the zone
+        ```
+        Router(config)# interface <interface>
+        Router(config-if)# zone-member security INSIDE
+        Router(config)# interface <interface>
+        Router(config-if)# zone-member security INTERNET
+        ```
+        * Validate
+            ```
+            Router# show zone security
+            ```
+
+* IPSec Site-to-Site VPN
+    * Enabling IKE policy on the router
+        ```
+        Router(config)# crypto isakmp enable
+        Router(config)# crypto isakmp policy <priority> - lower is higher
+        ```
+    * Example policy configuration
+        ```
+        Router(config)# crypto isakmp policy <priority> - lower is higher
+        Router(config-isakmp)# hash sha
+        Router(config-isakmp)# authentication pre-share
+        Router(config-isakmp)# group 14
+        Router(config-isakmp)# lifetime 3600
+        Router(config-isakmp)# encryption aes 256
+        Router(config-isakmp)# end
+        ```
+    * Validation
+        ```
+        Router# show crypto isakmp policy
+        ```
+    * Configuring Keys
+        - IP indicates the router to which we will be tunneling
+        ```
+        Router(config)# crypto isakmp key <password> address <ip-address>
+        Router(config)# crypto ipsec transform-set 50 esp-aes 256 esp-sha-hmac
+        Router(config)# crypto ipsec security-association lifetime seconds <seconds>
+        ```
+    * Defining the traffic of interest and assigning it to the map
+        * Example ACL of traffic
+            ```
+            Router(config)# access-list <access-list-id> permit ip 192.168.1.0 0.0.0.255 192.168.3.0 0.0.0.255
+            ```
+        * Setting map for ACL
+            ```
+            Router(config)# crypto map CMAP 10 ipsec-isakmp
+            Router(config-crypto-map)# match address <access-list-id>
+            ```
+        * Setting addresses, etc
+            ```
+            Router(config-crypto-map)# set peer <ip-address>
+            Router(config-crypto-map)# set pfs <group>
+            ```
+        * Tag below must agree with `Router(config)# crypto ipsec transform-set <ID> esp-aes 256 esp-sha-hmac` in Configuring Keys
+            ```
+            Router(config-crypto-map)# set transform-set <ID>
+            Router(config-crypto-map)# set security-association lifetime seconds <seconds>
+            Router(config-crypto-map)# exit
+            ```
+        * Applying map
+            ```
+            Router(config)# interface S0/0/0
+	        Router(config-if)# crypto map CMAP
+            ```
+
+* Configuring a point-to-point tunnel - GRE VPN
+    * Configuring the interface for the GRE tunnel
+        ```
+        WEST(config)# interface tunnel 0
+        WEST(config-if)# ip address 172.16.12.1 255.255.255.252
+
+        # Source is where the package comes from
+
+        WEST(config-if)# tunnel source s0/0/0
+
+        # Dest is where we send the package
+
+        WEST(config-if)# tunnel destination 10.2.2.1 # <ip EAST>
+        
+        # Another example
+        
+        EAST(config)# interface tunnel 0
+        EAST(config-if)# ip address 172.16.12.2 255.255.255.252
+        EAST(config-if)# tunnel source 10.2.2.1
+        EAST(config-if)# tunnel destination 10.1.1.1 / <ip WEST>
+        ```
+    * Setting up routing through a GRE tunnel
+        ```
+        WEST(config)# router ospf 1
+        WEST(config-router)# network 172.16.1.0 0.0.0.255 area 0
+        WEST(config-router)# network 172.16.12.0 0.0.0.3 area 0
+        ```
+
+* Configuring IPv6 tunnels
+    * Initial setup. The tunnel will be between router A and B via IPv4
+        ```
+        RouterA(config)# ipv6 unicast-routing
+        
+        RouterA(config)# interface fa0
+        RouterA(config-if)# ipv6 address FEC0:0:0:1111::/64 eui-64
+        
+        RouterA(config)# interface fa1
+        RouterA(config-if)# ip address 10.1.1.1 255.255.0.0
+        ```
+    * Configuring tunnel
+        ```
+        RouterA(config)# interface tunnel0
+        RouterA(config-if)# no ip address
+        RouterA(config-if)# ipv6 address FEC0:0:0:2222::1/124
+        RouterA(config-if)# tunnel source fa1
+        RouterA(config-if)# tunnel destination 10.1.1.2
+        RouterA(config-if)# tunnel mode ipv6ip
+        ```
+
+* Dynamic VPN
+    * Hub configuration
+        - The `tunnel key NR` is only required when there is more than one mGRE interface on the router with the same tunnel source
+        ```
+        interface tunnel 0
+        ip address 10.0.0.254 255.255.255.0
+        tunnel source fa 0/0
+        tunnel mode gre multipoint
+        tunnel key 9999 (opcjonalnie)
+        
+        # Enabling nhrp on mgre interface
+        ip nhrp network-id 10000
+        ```
+    * Spoke configuration
+        ```
+	    interface tunnel 0
+		ip address 10.0.0.1 255.255.255.0
+		tunnel source fa 0/0
+		tunnel destination 172.16.0.254
+		tunnel key 9999 # opcjonalnie
+		ip nhrp network-id 10000
+
+		# Spoke must register with hub
+		ip nhrp nhs 10.0.0.254
+
+		# Static mapping of address and NHS to physical address
+		ip nhrp map 10.0.0.254 172.16.0.254
         ```

@@ -6,6 +6,7 @@ Some intresting labs:
 * [Securing layer 2](https://ccnasec.com/6-3-1-1-lab-securing-layer-2-switches-instructor-version/)
 * [Site-To-Site VPN](https://ccnasec.com/8-4-1-3-lab-configuring-a-site-to-site-vpn-using-cisco-ios-instructor-version/)
 
+## Configurations
 
 * vlan
     * Creating a vlan

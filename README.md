@@ -1,3 +1,12 @@
+Usefull site: https://ccnasec.com
+Some intresting labs:
+* [Setup and manage passwords](https://ccnasec.com/2-6-1-2-lab-securing-the-router-for-administrative-access-instructor-version/)
+* [AAA and Radius](https://ccnasec.com/3-6-1-1-lab-securing-administrative-access-using-aaa-and-radius-instructor-version/)
+* [Zone based policy](https://ccnasec.com/4-4-1-2-lab-configuring-zone-based-policy-firewalls-instructor-version/)
+* [Securing layer 2](https://ccnasec.com/6-3-1-1-lab-securing-layer-2-switches-instructor-version/)
+* [Site-To-Site VPN](https://ccnasec.com/8-4-1-3-lab-configuring-a-site-to-site-vpn-using-cisco-ios-instructor-version/)
+
+
 * vlan
     * Creating a vlan
         ```
@@ -230,6 +239,19 @@
             ```
             Router# copy scp: flash:
             ```
+    * Http server
+        ```
+        Switch(config)# ip http server
+        ```
+        * https
+            ```
+            Switch(config)# ip http secure-server
+            ```
+        * Disable hhtp server (enabled by default)
+            ```
+            Switch(config)# no ip http server
+            Switch(config)# no ip http secure-server
+            ```
 
 * ACL (Access Lists)
     * Standard ACL
@@ -255,6 +277,47 @@
     * Connect ACL to interface
         ``` Switch
         Switch(config-if)# ip access-group <acl_number> <in|out>
+        ```
+    * Vlan ACL
+        First define ACL
+        ```
+        Switch(config)# access-list 100 permit ip any host 172.18.1.3
+        ```
+
+        Create VLAN ACL and map ACL
+        ```
+        Switch(config)# vlan access-map NOT-TO-SERVER 10
+        Switch(config-access-map)# match ip address 100
+        Switch(config-access-map)# action drop
+        ```
+
+        Map rule to vlan
+        ```
+        vlan filter NOT-TO-SERVER vlan-list 100
+        ```
+    * Named ACL
+        * stadard ACL
+            ```
+            Router(config)# ip access-list standard <acl_name>
+            Router(config-std-nacl)# deny 172.18.0.0 0.0.255.255
+            Router(config-std-nacl)# permit any
+            ```
+        * extended ACL
+            ```
+            Router(config)# ip access-list extended <acl_name>
+            Router(config-ext-nacl)# permit tcp 172.18.0.0 0.0.255.255 host 172.16.10.10 eq 80
+            Router(config-ext-nacl)# deny ip 172.18.0.0 0.0.255.255 172.16.0.0 0.0.255.255
+            Router(config-ext-nacl)# permit ip any any 
+            Router(config)# access-list 102 deny any any eq 80 time-range BLOCKHTTP
+            Router(config)# access-list 102 permit ip any any
+            ```
+    * Time based ACL
+        ```
+        Router(config)# time-range BLOCKHTTP
+        Router(config)# time-range BLOCKHTTP
+        Router(config-time-range)# absolute start 08:00 23 May 2006 end 20:00 26 May 2006
+        Router(config)# time-range BLOCKHTTP
+        Router(config-time-range)# periodic weekdays 18:00 to 23:00
         ```
     * Examples
         * PC2 is unable to communicate with computer PC3 but should be able to communicate with Router RB
@@ -529,6 +592,28 @@
             ```
             Router# show ip route
             ```
+        * Timers
+            ```
+            Router(config-router)# timers basic <update_timer> <invalid_timer> <hold-down timer> <flush timer> 
+            ```
+            * Example:
+                ```
+                Router(config)# router rip
+                Router(config-router)# timers basic 20 120 120 160
+                ```
+        * Passive interface
+            ```
+            passive-interface <interface>
+            ```
+            * example
+                ```
+                Router(config)# router rip
+                Router(config-router)# network 10.4.0.0
+                Router(config-router)# network 10.2.0.0
+                Router(config-router)# passive-interface s0
+                ```
+
+            
     * OSPF
         ```
          Router(config)# router ospf <process_id>
@@ -551,6 +636,19 @@
         Router# show ip ospf neighbor
         Router# show ip route
         ```
+
+    * EIGRP
+        ```
+        Router(config)# router eigrp <autonomus system>
+        Router(config-router)# network <network_address>
+        ```
+        * Example
+            ```
+            Router(config)# router eigrp 1
+            Router(config-router)# network 172.16.0.0
+            Router(config-router)# network 10.0.0.0 
+            ```
+
 
 * DHCP
     - Order in which u do exclusion, binding and common pools matter (first exclusion/binding then common pools)
@@ -614,6 +712,23 @@
         Switch# show running-config dhcp
         Switch# show ip dhcp snooping
         ```
+    * ip helper
+        ```
+        Router(config-if)# ip helper-address <ip address> 
+        ```
+        - Customize what is forwarding
+            ```
+            Router(config)# ip forward-protocol udp 107
+            Router(config)# no ip forward-protocol udp 69
+            ```
+            Following UDP ports are forwarded by default:
+            * TFTP (port 69)
+            * DNS (port 53)
+            * Time (port 37)
+            * NetBIOS (ports 137-138)
+            * ND (Network Disks – used by Sun workstations)
+            * TACACS (port 49)
+            * BOOTP/DHCP (ports 67-68) 
 
 * Overall config/ Passwords
     - Can be done both on a switch and a router
@@ -684,7 +799,7 @@
             ````
     * Setting banner for login screen
         ```
-        Router(config)# banner motd $Wir mussen die Juden ausrotten$
+        Router(config)# banner motd $DEFINITLY NON ANTISEMITIC BANNER$
         ```
     * Create new user
         ```
@@ -837,10 +952,17 @@
             Router(config)# logging host <ip-address>
             ```
         * Setting moment of log trap
-            - 0 -> emergencies
-	        - 7 -> debugging
+            |number|level|description|
+            |0|emergencies|System is unusable|
+            |1|alerts|Immediate action required|
+            |2|critical|Critical conditions|
+            |3|errors|Error conditions|
+            |4|warnings|Warning conditions|
+            |5|notifications|Normal but significant condition|
+            |6|informational|Informational messages|
+            |7|debugging|Debugging messages|
             ```
-	        Router(config)# logging trap ? [0-7]
+	        Router(config)# logging trap <0-7>
             ```
         * Show logging status
             ```
@@ -922,7 +1044,7 @@
         Router(config)# zone security INTERNET
         ```
     * Creation of security policies
-        - utworzenie class-map, ktore bedzie zezwalal na dany ruch z wewnatrz do internetu match-any -> wystarczy, aby tylko jeden z poniższych matchy pasował. Dla tego przykladu wyjdzie nam TCP or UDP or ICMP
+        - creating class-map, which allow traffic from inside to internet match-any -> At least one must match
         ```
         Router(config)# class-map type inspect match-any INSIDE_PROTOCOLS
         Router(config-cmap)# match protocol tcp
